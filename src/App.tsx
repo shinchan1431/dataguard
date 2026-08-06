@@ -4,7 +4,7 @@ import { analyzeEmail } from './ai'
 import type { EmailAnalysis } from './ai'
 import './index.css'
 
-type View = 'inbox' | 'tasks' | 'crm' | 'style'
+type View = 'inbox' | 'tasks' | 'calendar' | 'crm' | 'style'
 
 interface Email {
   id: string
@@ -22,6 +22,8 @@ interface Email {
   ai_urgency: string | null
   ai_fraud_risk: number | null
   ai_fraud_flags: string[] | null
+  ai_spam_risk: number | null
+  ai_spam_flags: string[] | null
   ai_satisfaction: number | null
   ai_summary: string | null
   ai_next_action: string | null
@@ -58,6 +60,20 @@ interface WritingSample {
   id: string
   content: string
   tone: string
+  created_at: string
+}
+
+interface Meeting {
+  id: string
+  email_id: string | null
+  title: string
+  attendee_email: string
+  attendee_name: string | null
+  scheduled_at: string
+  duration_minutes: number
+  location: string
+  status: string
+  notes: string | null
   created_at: string
 }
 
@@ -105,12 +121,17 @@ export default function App() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [crm, setCrm] = useState<CrmContact[]>([])
   const [samples, setSamples] = useState<WritingSample[]>([])
+  const [meetings, setMeetings] = useState<Meeting[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [style, setStyle] = useState({ tone: 'friendly', signature: 'Best regards,\nThe Team' })
   const [newSample, setNewSample] = useState('')
   const [analyzing, setAnalyzing] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [scheduleEmail, setScheduleEmail] = useState<Email | null>(null)
+  const [scheduleDate, setScheduleDate] = useState('')
+  const [scheduleTime, setScheduleTime] = useState('14:00')
+  const [scheduleLocation, setScheduleLocation] = useState('Zoom')
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -119,22 +140,118 @@ export default function App() {
 
   const loadData = useCallback(async () => {
     setLoading(true)
-    const [{ data: em }, { data: tk }, { data: cr }, { data: ws }] = await Promise.all([
+    const [{ data: em }, { data: tk }, { data: cr }, { data: ws }, { data: mt }] = await Promise.all([
       supabase.from('emails').select('*').order('received_at', { ascending: false }),
       supabase.from('tasks').select('*').order('created_at', { ascending: false }),
       supabase.from('crm_contacts').select('*').order('created_at', { ascending: false }),
       supabase.from('writing_samples').select('*').order('created_at', { ascending: false }),
+      supabase.from('meetings').select('*').order('scheduled_at', { ascending: true }),
     ])
     setEmails(em || [])
     setTasks(tk || [])
     setCrm(cr || [])
     setSamples(ws || [])
+    setMeetings(mt || [])
     setLoading(false)
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
 
   const sampleContents = samples.map((s) => s.content)
+
+  function CalendarView({ meetings, onCancel, onComplete }: { meetings: Meeting[]; onCancel: (id: string) => void; onComplete: (id: string) => void }) {
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = now.getMonth()
+    const [calMonth, setCalMonth] = useState(month)
+    const [calYear, setCalYear] = useState(year)
+    const firstDay = new Date(calYear, calMonth, 1).getDay()
+    const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate()
+    const monthName = new Date(calYear, calMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    const upcoming = meetings
+      .filter((m) => new Date(m.scheduled_at) >= new Date() && m.status === 'scheduled')
+      .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
+    const past = meetings
+      .filter((m) => new Date(m.scheduled_at) < new Date() || m.status !== 'scheduled')
+      .sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime())
+
+    const cells: (number | null)[] = []
+    for (let i = 0; i < firstDay; i++) cells.push(null)
+    for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+
+    const meetingsByDay = new Map<number, Meeting[]>()
+    meetings.forEach((m) => {
+      const md = new Date(m.scheduled_at)
+      if (md.getFullYear() === calYear && md.getMonth() === calMonth && m.status === 'scheduled') {
+        const day = md.getDate()
+        if (!meetingsByDay.has(day)) meetingsByDay.set(day, [])
+        meetingsByDay.get(day)!.push(m)
+      }
+    })
+
+    const prevMonth = () => { if (calMonth === 0) { setCalMonth(11); setCalYear(calYear - 1) } else setCalMonth(calMonth - 1) }
+    const nextMonth = () => { if (calMonth === 11) { setCalMonth(0); setCalYear(calYear + 1) } else setCalMonth(calMonth + 1) }
+    const today = new Date()
+    const isToday = (d: number) => today.getFullYear() === calYear && today.getMonth() === calMonth && today.getDate() === d
+
+    return (
+      <div className="calendar-layout">
+        <div className="calendar-main">
+          <div className="cal-head">
+            <h2>Calendar</h2>
+            <div className="cal-nav">
+              <button className="btn-ghost" onClick={prevMonth}>‹</button>
+              <span className="cal-month">{monthName}</span>
+              <button className="btn-ghost" onClick={nextMonth}>›</button>
+            </div>
+          </div>
+          <div className="cal-grid">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+              <div key={d} className="cal-dow">{d}</div>
+            ))}
+            {cells.map((d, i) => (
+              <div key={i} className={`cal-cell${d && isToday(d) ? ' today' : ''}`}>
+                {d && <span className="cal-day-num">{d}</span>}
+                {d && meetingsByDay.get(d)?.map((m) => (
+                  <div key={m.id} className="cal-event" title={m.title}>
+                    {new Date(m.scheduled_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} {m.title.slice(0, 20)}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="cal-side">
+          <h3>Upcoming Meetings</h3>
+          {upcoming.length === 0 ? <p className="muted">No upcoming meetings. Schedule one from an email.</p> : (
+            upcoming.map((m) => (
+              <div key={m.id} className="meeting-item">
+                <div className="meeting-time">{new Date(m.scheduled_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at {new Date(m.scheduled_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</div>
+                <div className="meeting-title">{m.title}</div>
+                <div className="meeting-meta">with {m.attendee_name || m.attendee_email} · {m.location} · {m.duration_minutes}min</div>
+                <div className="meeting-actions">
+                  <button className="btn-ghost" onClick={() => onComplete(m.id)}>Complete</button>
+                  <button className="btn-ghost" onClick={() => onCancel(m.id)}>Cancel</button>
+                </div>
+              </div>
+            ))
+          )}
+          {past.length > 0 && (
+            <>
+              <h3 className="cal-past-head">Past Meetings</h3>
+              {past.map((m) => (
+                <div key={m.id} className={`meeting-item ${m.status}`}>
+                  <div className="meeting-time">{new Date(m.scheduled_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+                  <div className="meeting-title">{m.title}</div>
+                  <div className="meeting-meta">{m.attendee_name || m.attendee_email} · <Chip label={m.status} color={m.status === 'completed' ? '#22c55e' : '#ef4444'} /></div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      </div>
+    )
+  }
   const selected = emails.find((e) => e.id === selectedId) || null
 
   const runAnalysis = async (email: Email) => {
@@ -153,6 +270,8 @@ export default function App() {
       ai_urgency: analysis.urgency,
       ai_fraud_risk: analysis.fraudRisk,
       ai_fraud_flags: analysis.fraudFlags,
+      ai_spam_risk: analysis.spamRisk,
+      ai_spam_flags: analysis.spamFlags,
       ai_satisfaction: analysis.satisfaction,
       ai_summary: analysis.summary,
       ai_next_action: analysis.nextAction,
@@ -213,6 +332,37 @@ export default function App() {
     await loadData()
   }
 
+  const scheduleMeeting = async (email: Email, date: string, time: string, location: string) => {
+    const scheduledAt = new Date(`${date}T${time}`).toISOString()
+    await supabase.from('meetings').insert({
+      email_id: email.id,
+      title: email.subject,
+      attendee_email: email.from_address,
+      attendee_name: email.from_name,
+      scheduled_at: scheduledAt,
+      location,
+      status: 'scheduled',
+    })
+    await supabase.from('actions').insert({
+      email_id: email.id, type: 'schedule_meeting', label: 'Meeting scheduled',
+      detail: `${email.subject} on ${new Date(scheduledAt).toLocaleString()}`, performed_by: 'user',
+    })
+    showToast('Meeting scheduled')
+    await loadData()
+  }
+
+  const cancelMeeting = async (id: string) => {
+    await supabase.from('meetings').update({ status: 'cancelled' }).eq('id', id)
+    showToast('Meeting cancelled')
+    await loadData()
+  }
+
+  const completeMeeting = async (id: string) => {
+    await supabase.from('meetings').update({ status: 'completed' }).eq('id', id)
+    showToast('Meeting completed')
+    await loadData()
+  }
+
   const escalate = async (email: Email) => {
     await supabase.from('emails').update({ status: 'escalated' }).eq('id', email.id)
     await supabase.from('actions').insert({
@@ -270,13 +420,15 @@ export default function App() {
       { from_address: 'lisa@designhub.co', from_name: 'Lisa Park', subject: 'Re: Onboarding meeting next week', body: 'Thanks for the great onboarding session yesterday! The team really loved the product demo. Can we schedule a follow-up call for next Tuesday or Wednesday? I am available in the afternoons. Looking forward to it.', thread_id: 't4' },
       { from_address: 'tom@startupx.io', from_name: 'Tom Garcia', subject: 'Bug: Export feature broken', body: 'I am trying to export my dashboard data but I keep getting an error when I click the export button. I have tried clearing my cache. Can someone help me understand what is going wrong? This is confusing because it worked last week.', thread_id: 't5' },
       { from_address: 'jenny@happyclient.com', from_name: 'Jenny Liu', subject: 'Just wanted to say thank you!', body: 'I just wanted to reach out and say how amazing your support team has been. They resolved my issue in under an hour and were so friendly. You guys are doing a wonderful job. I will definitely be recommending your product to everyone I know. Thank you so much!', thread_id: 't6' },
+      { from_address: 'promo@megadeals-now.com', from_name: 'Mega Deals', subject: 'LIMITED TIME OFFER! 100% FREE weight loss miracle cure', body: 'Dear valued customer, congratulations! You have been selected for our exclusive limited time offer. Act now to claim your 100% FREE weight loss miracle cure. This offer expires soon so do not miss out. Click here to buy now and subscribe for more amazing deals. Unsubscribe to opt out.', thread_id: 't7' },
+      { from_address: 'seo@outsourcingworld.biz', from_name: 'SEO Services Pro', subject: 'We can rank your website #1 on Google - guaranteed income', body: 'Dear sir/madam, we noticed your website is not ranking on Google. We provide SEO services and backlinks to get traffic to your website. Work from home and earn money online with our guaranteed income system. Subscribe now for a free trial. Opt in today.', thread_id: 't8' },
     ]
     const existing = emails.length
     if (existing >= seeds.length) {
       showToast('Inbox already seeded')
       return
     }
-    for (const s of seeds) {
+    for (const s of seeds.slice(existing)) {
       await supabase.from('emails').insert({ ...s, to_address: 'support@ourcompany.com', received_at: new Date(Date.now() - Math.random() * 86400000).toISOString() })
     }
     showToast('Sample emails loaded')
@@ -286,6 +438,7 @@ export default function App() {
   const unreadCount = emails.filter((e) => !e.is_read).length
   const openTasks = tasks.filter((t) => t.status !== 'done').length
   const fraudAlerts = emails.filter((e) => (e.ai_fraud_risk ?? 0) >= 50).length
+  const spamAlerts = emails.filter((e) => (e.ai_spam_risk ?? 0) >= 50).length
 
   return (
     <div className="app">
@@ -305,16 +458,19 @@ export default function App() {
             <button className={view === 'tasks' ? 'on' : ''} onClick={() => setView('tasks')}>
               Tasks{openTasks > 0 && <span className="nav-badge warn">{openTasks}</span>}
             </button>
+            <button className={view === 'calendar' ? 'on' : ''} onClick={() => setView('calendar')}>Calendar{meetings.filter(m => m.status === 'scheduled').length > 0 && <span className="nav-badge">{meetings.filter(m => m.status === 'scheduled').length}</span>}</button>
             <button className={view === 'crm' ? 'on' : ''} onClick={() => setView('crm')}>CRM</button>
             <button className={view === 'style' ? 'on' : ''} onClick={() => setView('style')}>Style</button>
           </nav>
         </div>
       </header>
 
-      {fraudAlerts > 0 && (
+      {(fraudAlerts > 0 || spamAlerts > 0) && (
         <div className="fraud-banner">
           <span className="fraud-icon">!</span>
-          {fraudAlerts} fraudulent email{fraudAlerts > 1 ? 's' : ''} detected — review before responding.
+          {fraudAlerts > 0 && `${fraudAlerts} fraudulent email${fraudAlerts > 1 ? 's' : ''} detected`}
+          {fraudAlerts > 0 && spamAlerts > 0 && ' · '}
+          {spamAlerts > 0 && `${spamAlerts} spam email${spamAlerts > 1 ? 's' : ''} detected`} — review before responding.
         </div>
       )}
 
@@ -407,6 +563,13 @@ export default function App() {
                           </div>
                         </div>
                         <div className="ai-card">
+                          <span className="ai-label">Spam Risk</span>
+                          <div className="ai-score-row">
+                            <ScoreBar value={selected.ai_spam_risk ?? 0} color={selected.ai_spam_risk! >= 50 ? '#f59e0b' : '#22c55e'} />
+                            <span>{selected.ai_spam_risk}%</span>
+                          </div>
+                        </div>
+                        <div className="ai-card">
                           <span className="ai-label">Predicted Satisfaction</span>
                           <div className="ai-score-row">
                             <ScoreBar value={selected.ai_satisfaction ?? 0} color={selected.ai_satisfaction! >= 60 ? '#22c55e' : '#f59e0b'} />
@@ -419,6 +582,13 @@ export default function App() {
                         <div className="fraud-flags">
                           <strong>Fraud indicators:</strong>
                           <ul>{selected.ai_fraud_flags.map((f, i) => <li key={i}>{f}</li>)}</ul>
+                        </div>
+                      )}
+
+                      {selected.ai_spam_flags && selected.ai_spam_flags.length > 0 && (
+                        <div className="spam-flags">
+                          <strong>Spam indicators:</strong>
+                          <ul>{selected.ai_spam_flags.map((f, i) => <li key={i}>{f}</li>)}</ul>
                         </div>
                       )}
 
@@ -442,6 +612,7 @@ export default function App() {
                       <div className="action-bar">
                         <button className="btn-primary" onClick={() => sendReply(selected)}>Send Reply</button>
                         <button className="btn-secondary" onClick={() => createTask(selected)}>Create Task</button>
+                        <button className="btn-secondary" onClick={() => { setScheduleEmail(selected); setScheduleDate(new Date().toISOString().slice(0, 10)); setScheduleTime('14:00'); }}>Schedule Meeting</button>
                         <button className="btn-danger" onClick={() => escalate(selected)}>Escalate</button>
                       </div>
                     </div>
@@ -479,6 +650,8 @@ export default function App() {
               </div>
             )}
           </div>
+        ) : view === 'calendar' ? (
+          <CalendarView meetings={meetings} onCancel={cancelMeeting} onComplete={completeMeeting} />
         ) : view === 'crm' ? (
           <div className="card-view">
             <h2>CRM Contacts</h2>
@@ -550,6 +723,36 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {scheduleEmail && (
+        <div className="modal-overlay" onClick={() => setScheduleEmail(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Schedule Meeting</h3>
+            <p className="modal-sub">with {scheduleEmail.from_name || scheduleEmail.from_address}</p>
+            <label className="modal-field">
+              <span>Date</span>
+              <input type="date" value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} />
+            </label>
+            <label className="modal-field">
+              <span>Time</span>
+              <input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} />
+            </label>
+            <label className="modal-field">
+              <span>Location</span>
+              <select value={scheduleLocation} onChange={(e) => setScheduleLocation(e.target.value)}>
+                <option value="Zoom">Zoom</option>
+                <option value="Google Meet">Google Meet</option>
+                <option value="Phone Call">Phone Call</option>
+                <option value="Office">Office</option>
+              </select>
+            </label>
+            <div className="modal-actions">
+              <button className="btn-ghost" onClick={() => setScheduleEmail(null)}>Cancel</button>
+              <button className="btn-primary" onClick={() => { scheduleMeeting(scheduleEmail, scheduleDate, scheduleTime, scheduleLocation); setScheduleEmail(null) }}>Schedule</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast && <div className="toast">{toast}</div>}
 

@@ -13,6 +13,8 @@ export interface EmailAnalysis {
   urgency: Urgency
   fraudRisk: number
   fraudFlags: string[]
+  spamRisk: number
+  spamFlags: string[]
   satisfaction: number
   summary: string
   nextAction: string
@@ -27,6 +29,17 @@ const FRAUD_PATTERNS: { pattern: RegExp; flag: string }[] = [
   { pattern: /(invoice|attachment).{0,40}(click|download|enable)/i, flag: 'Suspicious attachment lure' },
   { pattern: /ceo.{0,20}(request|need|asking)/i, flag: 'Impersonation of executive' },
   { pattern: /security alert.{0,40}(suspend|terminate|close)/i, flag: 'Threat-based account intimidation' },
+]
+
+const SPAM_PATTERNS: { pattern: RegExp; flag: string }[] = [
+  { pattern: /(free trial|act now|limited time|offer expires|last chance|don't miss out)/i, flag: 'High-pressure marketing language' },
+  { pattern: /(weight loss|miracle cure|viagra|casino|betting|gambling|slots)/i, flag: 'Spam-prone product category' },
+  { pattern: /(click here|buy now|subscribe now|opt in|opt-out|unsubscribe)/i, flag: 'Bulk marketing call-to-action' },
+  { pattern: /(dear friend|dear sir\/madam|dear valued customer)/i, flag: 'Generic mass-mail salutation' },
+  { pattern: /(100% free|guaranteed income|work from home|make money|earn money online)/i, flag: 'Get-rich-quick scheme language' },
+  { pattern: /(seo services|ranking on google|backlinks|traffic to your website)/i, flag: 'Unsolicited service solicitation' },
+  { pattern: /(discount|sale|promotion|deal of the day|clearance)/i, flag: 'Promotional bulk content' },
+  { pattern: /(you have been selected|congratulations you|you are a winner)/i, flag: 'Mass-mail prize notification' },
 ]
 
 const EMOTION_LEXICON: { words: RegExp; emotion: Emotion; weight: number }[] = [
@@ -86,6 +99,18 @@ function detectFraud(text: string): { risk: number; flags: string[] } {
   }
   // External sender mismatch heuristic
   if (/(no-reply|donotreply|mailer)/i.test(text)) risk += 8
+  return { risk: Math.min(100, risk), flags }
+}
+
+function detectSpam(text: string): { risk: number; flags: string[] } {
+  let risk = 0
+  const flags: string[] = []
+  for (const { pattern, flag } of SPAM_PATTERNS) {
+    if (pattern.test(text)) {
+      risk += 15
+      flags.push(flag)
+    }
+  }
   return { risk: Math.min(100, risk), flags }
 }
 
@@ -173,6 +198,7 @@ export function analyzeEmail(
   const { emotion, score } = detectEmotion(text)
   const urgency = detectUrgency(text, emotion)
   const { risk, flags } = detectFraud(text)
+  const { risk: spamRisk, flags: spamFlags } = detectSpam(text)
   const satisfaction = predictSatisfaction(emotion, score, risk)
   const summary = summarizeThread(subject, body)
   const nextAction = nextBestAction(intent, urgency, emotion, risk)
@@ -185,6 +211,8 @@ export function analyzeEmail(
     urgency,
     fraudRisk: risk,
     fraudFlags: flags,
+    spamRisk,
+    spamFlags,
     satisfaction,
     summary,
     nextAction,
