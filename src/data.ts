@@ -1,0 +1,73 @@
+import type { DatasetSchema } from './types'
+
+export const customersDataset: DatasetSchema = {
+  name: 'customers.csv',
+  columns: [
+    { key: 'id', type: 'number' },
+    { key: 'name', type: 'string' },
+    { key: 'email', type: 'string' },
+    { key: 'age', type: 'number' },
+    { key: 'signup_date', type: 'date' },
+    { key: 'country', type: 'string' },
+    { key: 'is_active', type: 'boolean' },
+  ],
+  rows: [
+    { id: 1, name: 'Alice Johnson', email: 'alice@example.com', age: 34, signup_date: '2023-01-15', country: 'USA', is_active: true },
+    { id: 2, name: 'Bob Smith', email: 'bob@example.com', age: 28, signup_date: '2023-02-20', country: 'UK', is_active: true },
+    { id: 3, name: 'Carol White', email: 'carol@example.com', age: null, signup_date: '2023-03-10', country: 'Canada', is_active: false },
+    { id: 4, name: 'Dan Brown', email: 'dan@example.com', age: 41, signup_date: '2023-04-05', country: 'USA', is_active: true },
+    { id: 5, name: 'Eva Green', email: 'eva@example.com', age: 52, signup_date: '2023-05-12', country: 'Germany', is_active: true },
+    { id: 6, name: 'Frank Black', email: 'frank@example.com', age: 31, signup_date: '2023-06-18', country: 'UK', is_active: true },
+    { id: 7, name: 'Grace Lee', email: 'grace@example.com', age: 29, signup_date: '2023-07-22', country: 'USA', is_active: true },
+    { id: 8, name: 'Hank Hill', email: 'hank@example.com', age: 38, signup_date: '2023-08-30', country: 'Canada', is_active: false },
+    { id: 9, name: 'Ivy Stone', email: 'ivy@example.com', age: 26, signup_date: '2023-09-14', country: 'Germany', is_active: true },
+    { id: 10, name: 'Jack King', email: 'jack@example.com', age: 44, signup_date: '2023-10-01', country: 'USA', is_active: true },
+    { id: 11, name: 'Alice Johnson', email: 'alice@example.com', age: 34, signup_date: '2023-01-15', country: 'USA', is_active: true },
+    { id: 12, name: 'Kate Moss', email: 'kate@example.com', age: 37, signup_date: '2023-11-20', country: 'UK', is_active: true },
+    { id: 13, name: 'Leo Park', email: 'leo@example.com', age: 23, signup_date: '2023-12-05', country: 'USA', is_active: true },
+    { id: 14, name: 'Mia Rose', email: 'mia@example.com', age: 19, signup_date: '2024-01-10', country: 'France', is_active: true },
+    { id: 15, name: 'Nick Wood', email: 'nick@example.com', age: 60, signup_date: '2024-02-15', country: 'Germany', is_active: true },
+    { id: 16, name: 'Olivia Reed', email: 'olivia@example.com', age: 33, signup_date: '2024-03-22', country: 'USA', is_active: true },
+    { id: 17, name: 'Paul Wright', email: 'paul', age: 45, signup_date: '2024-04-30', country: 'UK', is_active: true },
+    { id: 18, name: 'Quinn Lake', email: 'quinn@example.com', age: 27, signup_date: '2024-05-18', country: 'Canada', is_active: true },
+    { id: 19, name: 'Ruth Vale', email: 'ruth@example.com', age: 36, signup_date: '2024-06-25', country: 'USA', is_active: true },
+    { id: 20, name: 'Sam Frost', email: 'sam@example.com', age: 150, signup_date: '2024-07-30', country: 'France', is_active: true },
+  ],
+}
+
+export const ordersDataset: DatasetSchema = {
+  name: 'orders.csv',
+  columns: [
+    { key: 'order_id', type: 'number' },
+    { key: 'customer_id', type: 'number' },
+    { key: 'product', type: 'string' },
+    { key: 'quantity', type: 'number' },
+    { key: 'price', type: 'number' },
+    { key: 'order_date', type: 'date' },
+    { key: 'status', type: 'string' },
+  ],
+  rows: [
+    { order_id: 101, customer_id: 1, product: 'Widget', quantity: 2, price: 19.99, order_date: '2023-02-01', status: 'shipped' },
+    { order_id: 102, customer_id: 2, product: 'Gadget', quantity: 1, price: 49.99, order_date: '2023-02-15', status: 'shipped' },
+    { order_id: 103, customer_id: 3, product: 'Widget', quantity: 5, price: 19.99, order_date: '2023-03-01', status: 'pending' },
+    { order_id: 104, customer_id: 4, product: 'Gizmo', quantity: 3, price: 29.99, order_date: '2023-03-20', status: 'shipped' },
+    { order_id: 105, customer_id: 5, product: 'Widget', quantity: 0, price: 19.99, order_date: '2023-04-02', status: 'cancelled' },
+    { order_id: 106, customer_id: 6, product: 'Gadget', quantity: 2, price: 49.99, order_date: '2023-04-18', status: 'shipped' },
+    { order_id: 107, customer_id: 7, product: 'Gizmo', quantity: 4, price: 29.99, order_date: '2023-05-05', status: 'shipped' },
+    { order_id: 108, customer_id: 8, product: 'Widget', quantity: 1, price: 19.99, order_date: '2023-05-22', status: 'pending' },
+    { order_id: 109, customer_id: 9, product: 'Gadget', quantity: 3, price: 49.99, order_date: '2023-06-10', status: 'shipped' },
+    { order_id: 110, customer_id: 10, product: 'Gizmo', quantity: 2, price: 29.99, order_date: '2023-06-25', status: 'shipped' },
+    { order_id: 111, customer_id: 11, product: 'Widget', quantity: 6, price: 19.99, order_date: '2023-07-01', status: 'shipped' },
+    { order_id: 112, customer_id: 12, product: 'Gadget', quantity: 1, price: 49.99, order_date: '2023-07-15', status: 'shipped' },
+    { order_id: 113, customer_id: 13, product: 'Gizmo', quantity: 2, price: 29.99, order_date: '2023-08-01', status: 'shipped' },
+    { order_id: 114, customer_id: 14, product: 'Widget', quantity: 4, price: 19.99, order_date: '2023-08-20', status: 'shipped' },
+    { order_id: 115, customer_id: 15, product: 'Gadget', quantity: 3, price: 49.99, order_date: '2023-09-05', status: 'shipped' },
+    { order_id: 116, customer_id: 16, product: 'Gizmo', quantity: 2, price: 29.99, order_date: '2023-09-22', status: 'shipped' },
+    { order_id: 117, customer_id: 17, product: 'Widget', quantity: 1, price: 19.99, order_date: '2023-10-01', status: 'shipped' },
+    { order_id: 118, customer_id: 18, product: 'Gadget', quantity: 5, price: 49.99, order_date: '2023-10-15', status: 'shipped' },
+    { order_id: 119, customer_id: 19, product: 'Gizmo', quantity: 2, price: 29.99, order_date: '2023-11-01', status: 'shipped' },
+    { order_id: 120, customer_id: 20, product: 'Widget', quantity: 3, price: 19.99, order_date: '2023-11-20', status: 'shipped' },
+  ],
+}
+
+export const datasets: DatasetSchema[] = [customersDataset, ordersDataset]
